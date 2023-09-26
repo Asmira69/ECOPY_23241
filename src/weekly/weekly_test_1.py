@@ -51,7 +51,7 @@ def merge_lists(*lists):
 
 #7
 def squared_odds(input_list):
-    squared_odds_list = [x**2 for i in input_list if i % 2 != 0]
+    squared_odds_list = [i**2 for i in input_list if i % 2 != 0]
     return squared_odds_list
 
 #8
