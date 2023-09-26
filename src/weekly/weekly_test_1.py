@@ -1,63 +1,67 @@
-
 #GY7EJG
+#1
 def evens_from_list(input_list):
-    return [num for num in input_list if num % 2 == 0]
+    even = [num for num in input_list if num % 2 == 0]
+    return even
 
-
+#2
 def every_element_is_odd(input_list):
     for num in input_list:
         if num % 2 == 0:
             return False
     return True
 
-
+#3
 def kth_largest_in_list(input_list, kth_largest):
-    if kth_largest <= 0:
-        raise ValueError("kth_largest must be a positive integer")
+    if kth_largest <= 0 or kth_largest > len(input_list):
+        raise ValueError("Érvénytelen k érték.")
 
-    unique_sorted_list = list(set(input_list))
-    unique_sorted_list.sort(reverse=True)
+    sorted_list = sorted(input_list, reverse=True)
 
-    if kth_largest > len(unique_sorted_list):
-        raise ValueError("kth_largest exceeds the number of unique elements in the input list")
+    kth_largest_element = sorted_list[kth_largest - 1]
 
-    return unique_sorted_list[kth_largest - 1]
+    return kth_largest_element
 
-
+#4
 def cumavg_list(input_list):
     cumulative_sum = 0
-    cumulative_averages = []
+    cumulative_average = []
 
-    for i, num in enumerate(input_list, start=1):
+    for i, num in enumerate(input_list, 1):
         cumulative_sum += num
         average = cumulative_sum / i
-        cumulative_averages.append(average)
+        cumulative_average.append(average)
 
-    return cumulative_averages
+    return cumulative_average
 
-
+#5
 def element_wise_multiplication(input_list1, input_list2):
-    return [x * y for x, y in zip(input_list1, input_list2)]
+    if len(input_list1) != len(input_list2):
+        raise ValueError("A ket lista hossza eltero.")
 
+    result = [x * y for x, y in zip(input_list1, input_list2)]
+    return result
 
+#6
 def merge_lists(*lists):
     merged_list = []
     for lst in lists:
         merged_list.extend(lst)
     return merged_list
 
-
+#7
 def squared_odds(input_list):
-    return [i * i for i in input_list if i % 2 != 0]
+    squared_odds_list = [x**2 for i in input_list if i % 2 != 0]
+    return squared_odds_list
 
-
+#8
 def reverse_sort_by_key(input_dict):
     keys = list(input_dict.keys())
-    keys.sort(reverse=True)
-    reverse_sorted_dict = {i: input_dict[i] for i in keys}
-    return reverse_sorted_dict
+    keys.sort(reverse = True)
+    sorted_dict = {i:input_dict[i] for i in keys}
+    return sorted_dict
 
-
+#9
 def sort_list_by_divisibility(input_list):
     by_two = []
     by_five = []
@@ -82,4 +86,3 @@ def sort_list_by_divisibility(input_list):
     }
 
     return Dict
-
