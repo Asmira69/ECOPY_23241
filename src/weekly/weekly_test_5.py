@@ -2,7 +2,9 @@
 
 import pandas as pd
 from pathlib import Path
-
+from typing import List
+import random
+from src.utils import LogisticDistribution
 
 #1
 # Chipotle fájl elérési útja
@@ -28,8 +30,6 @@ def number_of_observations(input_df):
     count = len(input_df)
     return count
 
-# Függvény hívása a 'food' DataFrame-mel
-observations_count = number_of_observations(food)
 
 #4
 def items_and_prices(input_df):
@@ -37,14 +37,8 @@ def items_and_prices(input_df):
     result_df = input_df[['item_name', 'item_price']]
     return result_df
 
-# Függvény hívása a 'food' DataFrame-mel
-items_prices_df = items_and_prices(food)
-
-# Eredmény kiírása
-print(items_prices_df)
 
 #5
-import pandas as pd
 
 def sorted_by_price(input_df):
     # Használjuk az előző függvényt az 'item_name' és 'item_price' oszlopok kiválasztására
@@ -55,14 +49,10 @@ def sorted_by_price(input_df):
 
     return sorted_df
 
-# Függvény hívása a 'food' DataFrame-mel
-sorted_food = sorted_by_price(food)
 
-# Eredmény kiírása
-print(sorted_food)
+
 
 #6
-import pandas as pd
 
 def avg_price(input_df):
     # Konvertáljuk az 'item_price' oszlopot float típusra
@@ -73,11 +63,7 @@ def avg_price(input_df):
 
     return average_price
 
-# Függvény hívása a 'food' DataFrame-mel
-average_price = avg_price(food)
 
-# Eredmény kiírása
-print(f"Az átlagos ár: {average_price}")
 
 #7
 import pandas as pd
@@ -94,14 +80,9 @@ def unique_items_over_ten_dollars(input_df):
 
     return unique_items_df
 
-# Függvény hívása a 'food' DataFrame-mel
-unique_items_over_ten_dollars_df = unique_items_over_ten_dollars(food)
 
-# Eredmény kiírása
-print(unique_items_over_ten_dollars_df)
 
 #8
-import pandas as pd
 
 def items_starting_with_s(input_df):
     # Szűrjük azokat a termékeket, amelyek neve 'S'-el kezdődik
@@ -109,11 +90,7 @@ def items_starting_with_s(input_df):
 
     return filtered_df
 
-# Függvény hívása a 'food' DataFrame-mel
-items_starting_with_s_df = items_starting_with_s(food)
 
-# Eredmény kiírása
-print(items_starting_with_s_df)
 
 #9
 def first_three_columns(input_df):
@@ -123,12 +100,6 @@ def first_three_columns(input_df):
     return result_df
 
 
-# Függvény hívása a 'food' DataFrame-mel
-cleaned_food = change_price_to_float(food)  # Először tisztítsuk az adatokat
-first_three_columns_df = first_three_columns(cleaned_food)
-
-# Eredmény kiírása
-print(first_three_columns_df)
 
 #10
 def every_column_except_last_two(input_df):
@@ -138,12 +109,6 @@ def every_column_except_last_two(input_df):
     return result_df
 
 
-# Függvény hívása a 'food' DataFrame-mel
-cleaned_food = change_price_to_float(food)  # Először tisztítsuk az adatokat
-every_column_except_last_two_df = every_column_except_last_two(cleaned_food)
-
-# Eredmény kiírása
-print(every_column_except_last_two_df)
 
 #11
 def sliced_view(input_df, columns_to_keep, column_to_filter, rows_to_keep):
@@ -172,11 +137,7 @@ def generate_quartile(input_df):
 
     return result_df
 
-# Függvény hívása a 'food' DataFrame-mel
-food_with_quartile = generate_quartile(food)
 
-# Eredmény kiírása
-print(food_with_quartile)
 
 #13
 def average_price_in_quartiles(input_df):
@@ -188,11 +149,7 @@ def average_price_in_quartiles(input_df):
 
     return avg_price_df
 
-# Függvény hívása a 'food_with_quartile' DataFrame-mel
-average_prices = average_price_in_quartiles(food_with_quartile)
 
-# Eredmény kiírása
-print(average_prices)
 
 #14
 def minmaxmean_price_in_quartile(input_df):
@@ -204,11 +161,7 @@ def minmaxmean_price_in_quartile(input_df):
 
     return result_df
 
-# Függvény hívása a 'food_with_quartile' DataFrame-mel
-minmaxmean_prices = minmaxmean_price_in_quartile(food_with_quartile)
 
-# Eredmény kiírása
-print(minmaxmean_prices)
 
 #15
 from random import seed, uniform
@@ -240,9 +193,7 @@ def gen_uniform_mean_trajectories(distribution, number_of_trajectories, length_o
 
 
 #16
-from typing import List
-import random
-from src.utils import LogisticDistribution
+
 
 def gen_logistic_mean_trajectories(distribution: LogisticDistribution,
                                     number_of_trajectories: int,
