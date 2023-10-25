@@ -1,7 +1,7 @@
 from pathlib import Path
 import pandas as pd
 import statsmodels.api as sm
-
+#GY7EJG
 
 #1
 datalib = Path.cwd().parent.joinpath('data')
