@@ -1,6 +1,42 @@
-
+from pathlib import Path
 import pandas as pd
 import statsmodels.api as sm
+
+
+#1
+datalib = Path.cwd().parent.joinpath('data')
+df = pd.read_parquet(datalib.joinpath('sp500.parquet'), engine='fastparquet')
+
+#2
+df_ff_factors = pd.read_parquet(datalib.joinpath('ff_factors.parquet'), engine='fastparquet')
+
+#3
+merged_df = pd.merge(df, df_ff_factors, on='Date', how='left')
+
+#4
+merged_df['Excess Return'] = merged_df['Monthly Returns'] - merged_df['RF']
+
+#5
+# Sorok rendezése dátum szerint
+merged_df = merged_df.sort_values(by='Date')
+
+# 'ex_ret_1' oszlop létrehozása
+merged_df['ex_ret_1'] = merged_df.groupby('Symbol')['Excess Return'].shift(-1)
+
+#6
+# 'ex_ret_1' oszlopban hiányzó sorok törlése
+merged_df = merged_df.dropna(subset=['ex_ret_1'])
+
+# 'HML' oszlopban hiányzó sorok törlése
+merged_df = merged_df.dropna(subset=['HML'])
+
+#7
+# Amazon részvényhez tartozó sorok kiválasztása
+amazon_df = merged_df[merged_df['Symbol'] == 'AMZN'].copy()
+
+# 'Symbol' oszlop eltávolítása
+amazon_df = amazon_df.drop(columns=['Symbol'])
+
 
 class LinearRegressionSM:
     def __init__(self, left_hand_side, right_hand_side):
