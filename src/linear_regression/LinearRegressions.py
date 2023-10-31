@@ -1,44 +1,40 @@
+from pathlib import Path
 import pandas as pd
 import statsmodels.api as sm
+import pathlib
+import typing
 #GY7EJG
 
 class LinearRegressionSM:
-    def __init__(self, left_hand_side, right_hand_side):
-        self.left_hand_side = left_hand_side[['Excess Return']]
-        self.right_hand_side = right_hand_side[['Mkt-RF', 'SMB', 'HML']]
-        self._model = None
-
-
-#8
+    def __init__(self, left_hand_side: pd.DataFrame, right_hand_side: pd.DataFrame):
+        self.left_hand_side = left_hand_side
+        self.right_hand_side = right_hand_side
 
     def fit(self):
-
-        x = sm.add_constant(self.right_hand_side)
+        X = sm.add_constant(self.right_hand_side)
         y = self.left_hand_side
+        model = sm.OLS(y, X).fit()
+        self._model = model
 
-        self._model = sm.OLS(y, x).fit()
-
-#9
     def get_params(self):
+        beta_params = self._model.params
+        beta_params.name = 'Beta coefficients'
+        return beta_params
 
-        return pd.Series(self._model.params, name='Beta coefficients')
-
-#10
     def get_pvalues(self):
+        pvalues_df = pd.Series(self._model.pvalues, name="P-values for the corresponding coefficients")
+        return pvalues_df 
 
-        return pd.Series(self._model.pvalues, name='P-values for the corresponding coefficients')
-
-
-
-   def get_wald_test_result(self, restr_matrix: np.ndarray):
-        wald_test = self._model.wald_test(restr_matrix)
-        fvalue = round(wald_test.statistic, 3)
+    def get_wald_test_result(self, restriction_matrix):
+        wald_test = self._model.wald_test(restriction_matrix, scalar=True)
+        fvalue = round(wald_test.fvalue, 2)
         pvalue = round(wald_test.pvalue, 3)
-        return f"F-value: {fvalue}, p-value: {pvalue}"
+        result_string = f"F-value: {fvalue}, p-value: {pvalue}"
+        return result_string
+    def get_model_goodness_values(self):
+        adjusted_r_squared = self._model.rsquared_adj
+        aic = self._model.aic
+        bic = self._model.bic
 
-#12
-def get_model_goodness_values(self) -> str:
-    ars: float = round(self._model.rsquared_adj, 3)
-    ak: float = round(self._model.aic, 3)
-    by: float = round(self._model.bic, 3)
-    return f"Adjusted R-squared: {ars}, Akaike IC: {ak}, Bayes IC: {by}"
+        result_string = f"Adjusted R-squared: {adjusted_r_squared:.3f}, Akaike IC: {aic:.2e}, Bayes IC: {bic:.2e}"
+        return result_string
