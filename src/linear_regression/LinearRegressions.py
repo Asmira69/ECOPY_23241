@@ -1,102 +1,92 @@
-#GY7EJG
-from pathlib import Path
+import statsmodels.api as sm
 import pandas as pd
 import numpy as np
 from scipy.stats import f, t
-import typing
 
 
-datalib = Path.cwd().parent.joinpath('data')
+class LinearRegressionSM:
+    def __init__(self, left_hand_side, right_hand_side):
+        self.left_hand_side = left_hand_side
+        self.right_hand_side=right_hand_side
+        self._model = None
 
-sp500_df = pd.read_parquet(datalib.joinpath('sp500.parquet'), engine='fastparquet')
-ff_factors_df = pd.read_parquet(datalib.joinpath('ff_factors.parquet'), engine='fastparquet')
-merged_df = pd.merge(sp500_df, ff_factors_df, on='Date', how='left')
-merged_df['Excess Return'] = merged_df['Monthly Returns'] - merged_df['RF']
-merged_df = merged_df.sort_values(by=['Symbol', 'Date'])
-merged_df['ex_ret_1'] = merged_df.groupby('Symbol')['Excess Return'].shift(-1)
-merged_df = merged_df.dropna(subset=['ex_ret_1'])
-merged_df = merged_df.dropna(subset=['HML'])
+    def fit(self):
+        X = sm.add_constant(self.right_hand_side)
+        model = sm.OLS(self.left_hand_side,X).fit()
+        self._model = model
 
-amazon_df = merged_df[merged_df['Symbol'] == 'AMZN'].copy()
-amazon_df = amazon_df.drop(columns=['Symbol'])
+    def get_params(self):
+        return pd.Series(self._model.params, name='Beta coefficients')
+
+    def get_pvalues(self):
+        return pd.Series(self._model.pvalues, name='P-values for corresponding coefficients')
+
+    def get_wald_test_result(self, restriction_matrix):
+        wald_test_result = self._model.wald_test(restriction_matrix)
+        fvalue = '{:.2f}'.format(round(float(wald_test_result.statistic), 2))
+        pvalue = '{:.3f}'.format(round(float(wald_test_result.pvalue), 3))
+        return f'F-value: {fvalue}, p-value: {pvalue}'
+
+    def get_model_goodness_values(self):
+        ars = '{:.3f}'.format(round(self._model.rsquared_adj, 3))
+        ak = '{:.2e}'.format(round(self._model.aic, 2))
+        by = '{:.2e}'.format(round(self._model.bic, 2))
+        return f'Adjusted R-squared: {ars}, Akaike IC: {ak}, Bayes IC: {by}'
+
 class LinearRegressionNP:
     def __init__(self, left_hand_side, right_hand_side):
         self.left_hand_side = left_hand_side
         self.right_hand_side = right_hand_side
-        self.coefficients = None
+        self._model = None
 
     def fit(self):
-        X = np.column_stack((np.ones(len(self.right_hand_side)), self.right_hand_side[['Mkt-RF', 'SMB', 'HML']]))
-        y = self.left_hand_side['Excess Return']
-
-        # OLS becslés
-        self.coefficients = np.linalg.inv(X.T @ X) @ X.T @ y
+        X = np.column_stack((np.ones(len(self.right_hand_side)), self.right_hand_side))
+        y = self.left_hand_side
+        beta = np.linalg.inv(X.T @ X) @ X.T @ y
+        self.beta = beta
 
     def get_params(self):
-        if self.coefficients is None:
-            raise ValueError("The model has not been fitted yet. Call the fit method first.")
-
-        beta_params = pd.Series(self.coefficients, index=['Intercept', 'Mkt-RF', 'SMB', 'HML'],
-                                name='Beta coefficients')
-        return beta_params
+        return pd.Series(self.beta, name='Beta coefficients')
 
     def get_pvalues(self):
-        if self.coefficients is None:
-            raise ValueError("The model has not been fitted yet. Call the fit method first.")
-
-        X = np.column_stack((np.ones(len(self.right_hand_side)), self.right_hand_side[['Mkt-RF', 'SMB', 'HML']]))
-        y = self.left_hand_side['Excess Return']
-
-        residuals = y - X @ self.coefficients
-        dof = len(y) - len(self.coefficients)
-        standard_errors = np.sqrt(np.sum(residuals ** 2) / dof)
-
-        t_stats = self.coefficients / standard_errors
-        p_values = pd.Series(min(t.sf(np.abs(t_stats), dof), 1 - t.sf(np.abs(t_stats), dof)) * 2,
-                             index=['Intercept', 'Mkt-RF', 'SMB', 'HML'],
-                             name='P-values for the corresponding coefficients')
-
+        X = np.column_stack((np.ones(len(self.right_hand_side)), self.right_hand_side))
+        y = self.left_hand_side
+        n, k = X.shape
+        beta = self.beta
+        H = X @ np.linalg.inv(X.T @ X) @ X.T
+        residuals = y - X @ beta
+        residual_variance = (residuals @ residuals) / (n - k)
+        standard_errors = np.sqrt(np.diagonal(residual_variance * np.linalg.inv(X.T @ X)))
+        t_statistics = beta / standard_errors
+        df = n - k
+        p_values = [2 * (1 - t.cdf(abs(t_stat), df)) for t_stat in t_statistics]
+        p_values = pd.Series(p_values, name="P-values for corresponding coefficients")
         return p_values
 
     def get_wald_test_result(self, R):
-        if self.coefficients is None:
-            raise ValueError("The model has not been fitted yet. Call the fit method first.")
-
-        X = np.column_stack((np.ones(len(self.right_hand_side)), self.right_hand_side[['Mkt-RF', 'SMB', 'HML']]))
-        y = self.left_hand_side['Excess Return']
-
-        residuals = y - X @ self.coefficients
-        dof = len(y) - len(self.coefficients)
-        SSR_restricted = np.sum(residuals ** 2)
-
-        R = np.array(R)
-        q, k = R.shape
-
-        F_statistic = ((SSR_restricted - np.sum(residuals ** 2)) / q) / (np.sum(residuals ** 2) / dof)
-
-        p_value = 1 - f.cdf(F_statistic, q, dof)
-
-        result_string = f"Wald: {F_statistic:.3f}, p-value: {p_value:.3f}"
-        return result_string
+        X = np.column_stack((np.ones(len(self.right_hand_side)), self.right_hand_side))
+        y = self.left_hand_side
+        beta = self.beta
+        residuals = y - X @ beta
+        r_matrix = np.array(R)
+        r = r_matrix @ beta
+        n = len(self.left_hand_side)
+        m, k = r_matrix.shape
+        sigma_squared = np.sum(residuals ** 2) / (n - k)
+        H = r_matrix @ np.linalg.inv(X.T @ X) @ r_matrix.T
+        wald = (r.T @ np.linalg.inv(H) @ r) / (m * sigma_squared)
+        p_value = 1 - f.cdf(wald, dfn=m, dfd=n - k)
+        return f'Wald: {wald:.3f}, p-value: {p_value:.3f}'
 
     def get_model_goodness_values(self):
-        if self.coefficients is None:
-            raise ValueError("The model has not been fitted yet. Call the fit method first.")
-
-        X = np.column_stack((np.ones(len(self.right_hand_side)), self.right_hand_side[['Mkt-RF', 'SMB', 'HML']]))
-        y = self.left_hand_side['Excess Return']
-
-        y_mean = np.mean(y)
-        y_pred = X @ self.coefficients
-        SSR = np.sum((y_pred - y_mean) ** 2)
-        SSE = np.sum((y - y_pred) ** 2)
-        SST = SSR + SSE
-
-        centered_r_squared = SSR / SST
-
+        X = np.column_stack((np.ones(len(self.right_hand_side)), self.right_hand_side))
+        y = self.left_hand_side
         n, k = X.shape
-        dof = n - k
-        adjusted_r_squared = 1 - (SSE / dof) / (SST / (n - 1))
-
-        result_string = f"Centered R-squared: {centered_r_squared:.3f}, Adjusted R-squared: {adjusted_r_squared:.3f}"
-        return result_string
+        beta = self.beta
+        y_pred = X @ beta
+        ssr = np.sum((y_pred - np.mean(y)) ** 2)
+        sst = np.sum((y - np.mean(y)) ** 2)
+        centered_r_squared = ssr / sst
+        adjusted_r_squared = 1 - (1 - centered_r_squared) * (n - 1) / (n - k)
+        result = f"Centered R-squared: {centered_r_squared:.3f}, Adjusted R-squared: {adjusted_r_squared:.3f}"
+        return result
