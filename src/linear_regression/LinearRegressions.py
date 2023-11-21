@@ -1,85 +1,55 @@
-    import numpy as np
-    import pandas as pd
-    from scipy.stats import t, f
+import pandas as pd
+import numpy as np
+from scipy.stats import t, f
 
-    class LinearRegressionGLS:
-        def __init__(self, left_hand_side, right_hand_side):
-            self.left_hand_side = left_hand_side
-            self.right_hand_side = right_hand_side
-            self._model = None
+class LinearRegressionGLS:
+    def __init__(self, left_hand_side, right_hand_side):
+        self.left_hand_side = left_hand_side.values
+        self.right_hand_side = right_hand_side.values
 
-        def fit(self):
-            # Feasible GLS becslés
-            X_ols = np.column_stack((np.ones(len(self.right_hand_side)), self.right_hand_side))
-            y_ols = self.left_hand_side
-            beta_ols = np.linalg.inv(X_ols.T @ X_ols) @ X_ols.T @ y_ols
+    def fit(self):
+        self.X = np.column_stack((np.ones(len(self.right_hand_side)), self.right_hand_side))
+        self.Y = self.left_hand_side
+        beta_ols = np.linalg.inv(self.X.T @ self.X) @ self.X.T @self.Y
+        resid_ols = self.Y - self.X @ beta_ols
+        log_resid_ols = np.log(resid_ols ** 2)
+        beta_omega = np.linalg.inv(self.X.T @ self.X) @ self.X.T @ log_resid_ols
+        V_inv_diag = 1 / np.sqrt(np.exp(self.X @ beta_omega))
+        self.V_inv = np.diag(V_inv_diag)
+        beta_gls = np.linalg.inv(self.X.T @ self.V_inv @ self.X) @ self.X.T @ self.V_inv @ self.Y
+        self.beta_params = beta_gls
 
-            # Hibatagok számolása
-            residuals = y_ols - X_ols @ beta_ols
+    def get_params(self):
+        return pd.Series(self.beta_params, name='Beta_coeffs')
 
-            # Hibatagok négyzete
-            residuals_squared = residuals ** 2
+    def get_pvalues(self):
+        self.fit()
+        dof = len(self.Y) - self.X.shape[1]
+        residuals = self.Y - self.X @ self.beta_params
+        residual_variance = (residuals @ residuals) / dof
+        t_stat = self.beta_params / np.sqrt(np.diag(residual_variance*np.linalg.inv(self.X.T @ self.V_inv @ self.X)))
+        p_values = pd.Series([min(value, 1 - value) * 2 for value in t.cdf(-np.abs(t_stat), df=dof)],name='P-values for the corresponding coefficients')
+        return p_values
 
-            # Új modell becslése
-            X_gls = np.column_stack(
-                (np.ones(len(self.right_hand_side)), np.log(residuals_squared), self.right_hand_side))
-            y_gls = np.log(self.left_hand_side)
+    def get_wald_test_result(self, restrictions):
+        self.fit()
+        r_matrix = np.array(restrictions)
+        r_vector = r_matrix @ self.beta_params
+        n = len(self.Y)
+        m, k = r_matrix.shape
+        residuals = self.Y - self.X @ self.beta_params
+        residual_variance = (residuals @ residuals) / (n - k)
+        H_matrix = r_matrix @ np.linalg.inv(self.X.T @ self.V_inv @ self.X) @ r_matrix.T
+        wald_value = (r_vector.T @ np.linalg.inv(H_matrix) @ r_vector) / (m * residual_variance)
+        p_value = 1 - f.cdf(wald_value, dfn=m, dfd=n - k)
+        return f'Wald: {wald_value:.3f}, p-value: {p_value:.3f}'
 
-            # 5.) Számold ki a becsült értékeket (logaritmikus négyzetes hibákat) és vedd a gyöküket (np.sqrt).
-            beta_gls = np.linalg.inv(X_gls.T @ weights_matrix_inverse @ X_gls) @ X_gls.T @ weights_matrix_inverse @ y_gls
-            beta_gls = np.sqrt(beta_gls)
-
-            # 6.) A kapott vektornak vedd elemenként az inverzét és helyezd el egy diagonális mátrix főátlójában őket (np.diag).
-            weights_matrix_inverse = np.diag(1 / beta_gls)
-
-            # GLS regresszió paraméterei
-            beta_gls = np.linalg.inv(X_gls.T @ weights_matrix_inverse @ X_gls) @ X_gls.T @ weights_matrix_inverse @ y_gls
-
-            self._model = {'beta_gls': beta_gls, 'weights_matrix_inverse': weights_matrix_inverse}
-
-        def get_params(self):
-            beta_gls = self._model['beta_gls']
-            return pd.Series(beta_gls, name='GLS Coefficients')
-
-        def get_pvalues(self):
-            X_gls = np.column_stack((np.ones(len(self.right_hand_side)), np.log(self._model['residuals_squared']),self.right_hand_side))
-            y_gls = np.log(self.left_hand_side)
-            n, k = X_gls.shape
-            beta_gls = self._model['beta_gls']
-            weights_matrix = np.linalg.inv(X_gls.T @ X_gls)
-            residuals = y_gls - X_gls @ beta_gls
-            residuals_variance = np.diagonal(residuals @ residuals / n)
-            standard_errors = np.sqrt(residuals_variance * np.diagonal(weights_matrix))
-            t_statistics = beta_gls / standard_errors
-            df = n - k
-            p_values = [2 * (1 - t.cdf(abs(t_stat), df)) for t_stat in t_statistics]
-            p_values = pd.Series(p_values, name="P-values for corresponding coefficients")
-            return p_values
-
-        def get_wald_test_result(self, R):
-            X_gls = np.column_stack((np.ones(len(self.right_hand_side)), np.log(self._model['residuals_squared']),self.right_hand_side))
-            y_gls = np.log(self.left_hand_side)
-            beta_gls = self._model['beta_gls']
-            residuals = y_gls - X_gls @ beta_gls
-            r_matrix = np.array(R)
-            r = r_matrix @ beta_gls
-            n = len(self.left_hand_side)
-            m, k = r_matrix.shape
-            sigma_squared = np.sum(residuals ** 2) / (n - k)
-            H = r_matrix @ np.linalg.inv(X_gls.T @ X_gls) @ r_matrix.T
-            wald = (r.T @ np.linalg.inv(H) @ r) / (m * sigma_squared)
-            p_value = 1 - f.cdf(wald, dfn=m, dfd=n - k)
-            return f'Wald: {wald:.3f}, p-value: {p_value:.3f}'
-
-        def get_model_goodness_values(self):
-            X_gls = np.column_stack((np.ones(len(self.right_hand_side)), np.log(self._model['residuals_squared']),self.right_hand_side))
-            y_gls = np.log(self.left_hand_side)
-            n, k = X_gls.shape
-            beta_gls = self._model['beta_gls']
-            y_pred = X_gls @ beta_gls
-            ssr = np.sum((y_pred - np.mean(y_gls)) ** 2)
-            sst = np.sum((y_gls - np.mean(y_gls)) ** 2)
-            centered_r_squared = ssr / sst
-            adjusted_r_squared = 1 - (1 - centered_r_squared) * (n - 1) / (n - k)
-            result = f"Centered R-squared: {centered_r_squared:.3f}, Adjusted R-squared: {adjusted_r_squared:.3f}"
-            return result
+    def get_model_goodness_values(self):
+        self.fit()
+        total_sum_of_squares = self.Y.T @ self.V_inv @ self.Y
+        residual_sum_of_squares = self.Y.T @ self.V_inv @ self.X @ np.linalg.inv(
+            self.X.T @ self.V_inv @ self.X) @ self.X.T @ self.V_inv @ self.Y
+        centered_r_squared = 1 - (residual_sum_of_squares / total_sum_of_squares)
+        adjusted_r_squared = 1 - (residual_sum_of_squares / (len(self.Y) - self.X.shape[1])) * (
+                len(self.Y) - 1) / total_sum_of_squares
+        return f"Centered R-squared: {centered_r_squared:.3f}, Adjusted R-squared: {adjusted_r_squared:.3f}"
